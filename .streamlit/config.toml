@@ -1,0 +1,17 @@
+# Streamlit base theme. Fine detail is handled by the CSS in theme.py.
+# primaryColor drives the sidebar sliders directly (their fill/thumb colour
+# is computed by Streamlit itself, not overridable via CSS), so it is set
+# to the orange accent rather than the navy brand colour.
+[theme]
+base = "light"
+primaryColor = "#E8792B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F8FC"
+textColor = "#1A2733"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

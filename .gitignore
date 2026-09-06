@@ -1,0 +1,6 @@
+# Virtual environment, tidak perlu ikut repo. Streamlit Cloud install ulang
+# dari requirements.txt.
+venv/
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
