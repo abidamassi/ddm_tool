@@ -47,9 +47,10 @@ inject_css()
 # =====================================================================
 # RENDER HELPERS
 # =====================================================================
-def show_df(df, hide_index=False, status_col=None):
+def show_df(df, hide_index=False, status_col=None, center=False, equal_width=False):
     """Themed HTML table: rounded container, navy header. See theme.render_table."""
-    render_table(df, hide_index=hide_index, status_col=status_col)
+    render_table(df, hide_index=hide_index, status_col=status_col,
+                 center=center, equal_width=equal_width)
 
 
 def show_chart(fig):
@@ -111,7 +112,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    ticker_in = st.text_input("Ticker", value="BBCA", max_chars=4,
+    ticker_in = st.text_input("Ticker", value="BBRI", max_chars=4,
                               help="Enter the 4-letter IDX code only. The .JK "
                                    "suffix is added automatically.").upper()
 
@@ -142,14 +143,7 @@ with st.sidebar:
                        int(A["forecast_years"]), 1, format="%d years")
 
     st.markdown("---")
-    run = st.button("Run analysis")
-
-    st.markdown(
-        f'<div style="font-size:.66rem;color:{COLORS["ice"]};line-height:1.55;'
-        f'margin-top:1rem;opacity:.75;">Dividends are discounted at the cost of '
-        f'equity, not WACC, because they accrue to shareholders alone. Payout, '
-        f'ROE, growth, and beta are derived from the company\'s own filings.</div>',
-        unsafe_allow_html=True)
+    run = st.button("Run analysis", use_container_width=True)
 
 
 # =====================================================================
@@ -235,86 +229,42 @@ if d.fx_rate != 1.0:
 
 
 # =====================================================================
-# D1 - DIVIDEND HISTORY
+# VERDICT (rendered first; only available once screening passes)
 # =====================================================================
-dp = r.get("div_profile")
-if dp is not None:
-    pill("01", "Dividend history",
-         "Payments are aggregated by calendar year from ex-dividend dates. The "
-         "current year is excluded from growth and consistency analysis.")
-    c1, c2 = st.columns([1.3, 1])
-    with c1:
-        show_chart(chart_dividend_history(dp, r.get("payout_info")))
-    with c2:
-        show_df(dividend_summary(dp), hide_index=True)
-    show_df(dividend_table(dp), hide_index=True)
-
-
-# =====================================================================
-# D2 - SCREENING
-# =====================================================================
-pill("02", "Model eligibility screening",
-     "These gates test whether a dividend discount model can be applied at all. "
-     "Unlike the DCF tool, financials are accepted here, that is the main use case.")
-
-if isinstance(scr.get("detail"), pd.DataFrame) and not scr["detail"].empty:
-    show_df(scr["detail"], hide_index=True, status_col="Status")
-
 if scr["passed"]:
-    st.markdown('<div class="callout"><b class="gate-ok">ELIGIBLE.</b> '
-                'All gates passed. The valuation below is calculated.</div>',
-                unsafe_allow_html=True)
-else:
-    st.markdown(f'<div class="callout"><b class="gate-no">CANNOT PROCEED.</b> '
-                f'{scr["status"]}</div>', unsafe_allow_html=True)
-    pill("03", "Data quality warnings")
-    render_flags(d.flags)
-    render_disclaimer()
-    st.stop()
+    val = r["valuation"]
+    rec = r["recommendation"]
+    drv = r["drivers"]
+    kep = r["ke_parts"]
+    proj = r["projection"]
+    fsum = r["forecast_summary"]
+    tv = r["terminal"]
+    sens = r["sensitivity"]
+    sc_df = r["scenarios"]
+    cc = r["crosscheck"]
 
+    pill("01", "Valuation verdict")
 
-val = r["valuation"]
-rec = r["recommendation"]
-drv = r["drivers"]
-kep = r["ke_parts"]
-proj = r["projection"]
-fsum = r["forecast_summary"]
-tv = r["terminal"]
-sens = r["sensitivity"]
-sc_df = r["scenarios"]
-cc = r["crosscheck"]
+    fv = val["fair_value_per_share"]
+    px = val["market_price"]
+    rating = rec["rating"]
+    rcolor = COLORS["ink_muted"] if rec.get("review_required") else \
+        RATING_COLOR.get(rating, COLORS["ink_muted"])
 
-# =====================================================================
-# DATA QUALITY
-# =====================================================================
-pill("03", "Data quality warnings",
-     "Read these before relying on any figure below. They record where a value "
-     "was missing, proxied, clipped, or where an assumption was constrained.")
-render_flags(d.flags)
+    sc_vals = [float(sc_df.loc[s, "Fair value"]) for s in ["BEAR", "BULL"]
+               if s in sc_df.index and pd.notna(sc_df.loc[s, "Fair value"])]
+    lo = min(sc_vals) if sc_vals else fv
+    hi = max(sc_vals) if sc_vals else fv
+    span = max(hi - lo, 1e-9)
+    pos = float(np.clip((px - lo) / span, 0, 1)) * 100
+    fv_pos = float(np.clip((fv - lo) / span, 0, 1)) * 100
 
+    rating_font = "1.5rem" if rec.get("review_required") else "2.5rem"
+    up = rec["upside"]
+    updown_label = "Downside" if (up is not None and np.isfinite(up) and up < 0) \
+        else "Upside"
 
-# =====================================================================
-# VERDICT
-# =====================================================================
-pill("04", "Valuation verdict")
-
-fv = val["fair_value_per_share"]
-px = val["market_price"]
-rating = rec["rating"]
-rcolor = COLORS["ink_muted"] if rec.get("review_required") else \
-    RATING_COLOR.get(rating, COLORS["ink_muted"])
-
-sc_vals = [float(sc_df.loc[s, "Fair value"]) for s in ["BEAR", "BULL"]
-           if s in sc_df.index and pd.notna(sc_df.loc[s, "Fair value"])]
-lo = min(sc_vals) if sc_vals else fv
-hi = max(sc_vals) if sc_vals else fv
-span = max(hi - lo, 1e-9)
-pos = float(np.clip((px - lo) / span, 0, 1)) * 100
-fv_pos = float(np.clip((fv - lo) / span, 0, 1)) * 100
-
-rating_font = "1.5rem" if rec.get("review_required") else "2.5rem"
-
-st.markdown(f"""
+    st.markdown(f"""
 <div class="verdict">
   <div class="row">
     <div>
@@ -332,8 +282,8 @@ st.markdown(f"""
       <div class="small">{rec['label']}</div>
     </div>
     <div>
-      <div class="lab">Upside</div>
-      <div class="big" style="color:{rcolor}">{f_pct(rec['upside'], 1, sign=True)}</div>
+      <div class="lab">{updown_label}</div>
+      <div class="big" style="color:{rcolor}">{f_pct(up, 1, sign=True)}</div>
       <div class="small">Dividend yield {f_pct(val['dividend_yield_current'])}</div>
     </div>
   </div>
@@ -348,8 +298,57 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if rec.get("review_required"):
-    callout(f"<b>Review required.</b> {rec['reason_override']}")
+    if rec.get("review_required"):
+        callout(f"<b>Review required.</b> {rec['reason_override']}")
+
+
+# =====================================================================
+# D1 - DIVIDEND HISTORY
+# =====================================================================
+dp = r.get("div_profile")
+if dp is not None:
+    pill("02", "Dividend history",
+         "Payments are aggregated by calendar year from ex-dividend dates. The "
+         "current year is excluded from growth and consistency analysis.")
+    c1, c2 = st.columns([1.3, 1])
+    with c1:
+        show_chart(chart_dividend_history(dp, r.get("payout_info")))
+    with c2:
+        show_df(dividend_summary(dp), hide_index=True)
+    dtab = dividend_table(dp).drop(columns=["Note"])
+    show_df(dtab, hide_index=True, center=True, equal_width=True)
+
+
+# =====================================================================
+# D2 - SCREENING
+# =====================================================================
+pill("03", "Model eligibility screening",
+     "These gates test whether a dividend discount model can be applied at all. "
+     "Unlike the DCF tool, financials are accepted here, that is the main use case.")
+
+if isinstance(scr.get("detail"), pd.DataFrame) and not scr["detail"].empty:
+    show_df(scr["detail"], hide_index=True, status_col="Status")
+
+if scr["passed"]:
+    st.markdown('<div class="callout"><b class="gate-ok">ELIGIBLE.</b> '
+                'All gates passed. The valuation above is calculated.</div>',
+                unsafe_allow_html=True)
+else:
+    st.markdown(f'<div class="callout"><b class="gate-no">CANNOT PROCEED.</b> '
+                f'{scr["status"]}</div>', unsafe_allow_html=True)
+    pill("04", "Data quality warnings")
+    render_flags(d.flags)
+    render_disclaimer()
+    st.stop()
+
+
+# =====================================================================
+# DATA QUALITY
+# =====================================================================
+pill("04", "Data quality warnings",
+     "Read these before relying on any figure below. They record where a value "
+     "was missing, proxied, clipped, or where an assumption was constrained.")
+render_flags(d.flags)
 
 
 # =====================================================================
@@ -382,8 +381,8 @@ with c2:
 po = r.get("payout_info")
 if po is not None and po.get("table") is not None:
     st.markdown('<p class="pill-note">Payout ratio, year by year '
-               '(last 10 years)</p>', unsafe_allow_html=True)
-    t = po["table"].tail(10).copy()
+               '(last 4 years)</p>', unsafe_allow_html=True)
+    t = po["table"].tail(4).copy()
     for c in ["DPS", "EPS (t-1)", "EPS (t)"]:
         t[c] = t[c].round(2)
     for c in ["Payout (lagged)", "Payout (contemporaneous)"]:
