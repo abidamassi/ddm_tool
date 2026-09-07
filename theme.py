@@ -137,12 +137,14 @@ section[data-testid="stSidebar"] div[data-testid="stSlider"] [style*="translate(
 }}
 
 section[data-testid="stSidebar"] .stButton button {{
-  background:var(--orange); color:{COLORS['white']} !important; border:0; width:100%;
+  background:var(--orange); color:{COLORS['white']} !important; border:0;
+  width:100% !important;
   font-weight:700; letter-spacing:.08em; text-transform:uppercase;
   font-size:.8rem; padding:.72rem 0; border-radius:var(--radius-sm);
 }}
 section[data-testid="stSidebar"] .stButton button:hover {{ background:var(--orange-dark); }}
-section[data-testid="stSidebar"] .stButton {{ width:100%; }}
+section[data-testid="stSidebar"] .stButton,
+section[data-testid="stSidebar"] .stButton > div {{ width:100% !important; }}
 section[data-testid="stSidebar"] hr {{ border-color:var(--navy-soft); margin:1.1rem 0; }}
 
 /* ---------- TYPOGRAPHY ---------- */
@@ -164,13 +166,13 @@ section[data-testid="stSidebar"] hr {{ border-color:var(--navy-soft); margin:1.1
   background:var(--navy); color:{COLORS['white']};
   padding:.34rem .95rem; border-radius:100px;
   font-size:.74rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
-  margin:1.9rem 0 .3rem 0;
+  margin:1.9rem 0 1rem 0;
 }}
 .pill .num {{
   background:var(--ice); color:var(--navy); border-radius:100px;
   padding:.02rem .46rem; font-size:.66rem; font-weight:700; letter-spacing:.04em;
 }}
-.pill-note {{ font-size:.8rem; color:var(--ink-muted); margin:0 0 .7rem 0; }}
+.pill-note {{ font-size:.8rem; color:var(--ink-muted); margin:0 0 1rem 0; }}
 
 /* ---------- METRIC STRIP ---------- */
 .mstrip {{ display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden; }}
@@ -181,7 +183,8 @@ section[data-testid="stSidebar"] hr {{ border-color:var(--navy-soft); margin:1.1
 
 /* ---------- VERDICT BAND (signature element) ---------- */
 .verdict {{ background:var(--navy); border-radius:var(--radius); padding:1.35rem 1.6rem; margin:.4rem 0 .3rem 0; }}
-.verdict .row {{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:2.4rem; }}
+.verdict .row {{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1.5rem 2rem; }}
+.verdict .row > div {{ flex:1 1 0; min-width:150px; }}
 .verdict .rating {{ font-size:2.5rem; font-weight:700; line-height:1; letter-spacing:-.02em; }}
 .verdict .lab {{ font-size:.64rem; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--ice); margin-bottom:.3rem; }}
 .verdict .big {{ font-size:1.5rem; font-weight:600; color:{COLORS['white']}; line-height:1; }}
@@ -227,6 +230,10 @@ section[data-testid="stSidebar"] hr {{ border-color:var(--navy-soft); margin:1.1
 .dtable tbody td.num {{ text-align:right; font-variant-numeric:tabular-nums; }}
 .dtable tbody tr:nth-child(even) {{ background:var(--ice-faint); }}
 .dtable tbody tr:hover {{ background:var(--ice-pale); }}
+/* Optional variants: centred text, and columns split evenly across the
+   table width instead of sizing to content. See theme.render_table. */
+.dtable-center thead th, .dtable-center tbody td {{ text-align:center !important; white-space:normal; }}
+.dtable-fixed {{ table-layout:fixed; }}
 .status-chip {{
   display:inline-block; padding:.14rem .6rem; border-radius:100px;
   font-size:.68rem; font-weight:700; letter-spacing:.04em;
@@ -313,17 +320,29 @@ def _is_year_like(series):
         return False
 
 
-def render_table(df, hide_index=False, status_col=None, index_name=None):
+def render_table(df, hide_index=False, status_col=None, index_name=None,
+                 center=False, equal_width=False):
     """
     Render a DataFrame as a themed HTML table: rounded container, navy
     header, zebra rows. Used everywhere instead of st.dataframe, whose
     header is drawn on canvas and cannot take a CSS colour.
+
+    center       : every header and cell, text or numeric, is centred
+                   instead of the default left/right split.
+    equal_width  : columns split the table width evenly (fixed layout)
+                   instead of sizing to content.
     """
     if df is None or df.empty:
         st.markdown('<div class="dtable-wrap"><table class="dtable">'
                     '<tbody><tr><td>No data.</td></tr></tbody></table></div>',
                     unsafe_allow_html=True)
         return
+
+    table_cls = "dtable"
+    if center:
+        table_cls += " dtable-center"
+    if equal_width:
+        table_cls += " dtable-fixed"
 
     cols = list(df.columns)
     numeric_cols = {c for c in cols if pd.api.types.is_numeric_dtype(df[c])}
@@ -357,7 +376,7 @@ def render_table(df, hide_index=False, status_col=None, index_name=None):
         body_rows.append(f"<tr>{cells}</tr>")
 
     st.markdown(
-        f'<div class="dtable-wrap"><div class="dtable-scroll"><table class="dtable">'
+        f'<div class="dtable-wrap"><div class="dtable-scroll"><table class="{table_cls}">'
         f'<thead><tr>{head}</tr></thead>'
         f'<tbody>{"".join(body_rows)}</tbody>'
         f'</table></div></div>',

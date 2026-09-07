@@ -297,5 +297,5 @@ def batch_ddm(tickers, rf=None, erp=None, terminal_g=None, years=None,
 
 if __name__ == "__main__":
     import sys
-    tk = sys.argv[1] if len(sys.argv) > 1 else "BBCA"
+    tk = sys.argv[1] if len(sys.argv) > 1 else "BBRI"
     print_ddm_report(analyze_ddm(tk))
